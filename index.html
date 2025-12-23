@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inventory MVP v2 (Modular + Fake Auth)</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>庫存管理 MVP v2</h1>
+      <div class="muted">模組化（db/ui/auth）＋假登入＋可部署 GitHub Pages</div>
+    </div>
+    <div class="userbox">
+      <span id="whoami" class="pill"></span>
+      <button id="logoutBtn" class="btn">登出</button>
+    </div>
+  </header>
+
+  <!-- Login -->
+  <section id="loginView" class="card">
+    <h2>登入（假帳號）</h2>
+    <div class="grid2">
+      <div>
+        <label>帳號</label>
+        <input id="loginUser" placeholder="tech / manager / guest" />
+      </div>
+      <div>
+        <label>密碼</label>
+        <input id="loginPass" type="password" placeholder="tech123 / manager123 / guest123" />
+      </div>
+    </div>
+    <button id="loginBtn" class="btn primary">登入</button>
+    <div id="loginMsg" class="muted"></div>
+    <hr />
+    <div class="muted">
+      權限示意：<br/>
+      - manager：可新增商品/倉庫、可調整盤點、可匯入匯出、可清空<br/>
+      - tech：可入庫/出庫、可看報表<br/>
+      - guest：僅可查看庫存與異動
+    </div>
+  </section>
+
+  <!-- App -->
+  <main id="appView" class="grid" style="display:none;">
+    <section class="card span4">
+      <h2>1) 基本設定</h2>
+
+      <div class="section">
+        <h3>倉庫</h3>
+        <div class="row">
+          <input id="whName" placeholder="例如：冷藏庫A / 試劑櫃B" />
+          <button id="addWhBtn" class="btn">新增</button>
+        </div>
+        <div id="whList" class="muted"></div>
+      </div>
+
+      <div class="section">
+        <h3>商品</h3>
+        <input id="prodName" placeholder="商品名稱，例如：Antibody X" />
+        <div class="row">
+          <input id="prodBarcode" placeholder="條碼（可留空）" />
+          <input id="prodUnit" placeholder="單位，例如：vial / box" />
+        </div>
+        <button id="addProdBtn" class="btn">新增商品</button>
+        <div id="prodList" class="muted"></div>
+      </div>
+    </section>
+
+    <section class="card span8">
+      <h2>2) 庫存異動</h2>
+
+      <div class="row">
+        <div>
+          <label>動作</label>
+          <select id="txType">
+            <option value="IN">入庫</option>
+            <option value="OUT">出庫</option>
+            <option value="ADJUST">盤點調整</option>
+          </select>
+        </div>
+        <div>
+          <label>倉庫</label>
+          <select id="txWh"></select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>商品</label>
+          <select id="txProd"></select>
+        </div>
+        <div>
+          <label>條碼快速查找（掃描或輸入後 Enter）</label>
+          <input id="txScan" placeholder="例如：ABC-12345" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>批號（Lot）</label>
+          <input id="txLot" placeholder="例如：L20251223-01" />
+        </div>
+        <div>
+          <label>效期（Expiration）</label>
+          <input id="txExp" type="date" />
+        </div>
+        <div>
+          <label>數量</label>
+          <input id="txQty" type="number" step="1" placeholder="例如：10" />
+        </div>
+      </div>
+
+      <label>備註</label>
+      <input id="txNote" placeholder="例如：新到貨/領用/報廢" />
+
+      <button id="commitTxBtn" class="btn primary">送出異動</button>
+      <div id="txMsg" class="muted"></div>
+
+      <hr />
+
+      <div class="row">
+        <div>
+          <label>搜尋（商品/條碼/批號/倉庫）</label>
+          <input id="search" placeholder="例如：Antibody / L2025 / 冷藏庫" />
+        </div>
+        <div>
+          <label>效期警示（天）</label>
+          <input id="expWarnDays" type="number" value="30" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:8px;">
+        <button id="exportBtn" class="btn">匯出 JSON</button>
+        <button id="importBtn" class="btn">匯入 JSON</button>
+        <button id="resetBtn" class="btn danger">清空資料</button>
+      </div>
+      <textarea id="ioArea" rows="5" placeholder="匯出會顯示在此；匯入請貼上 JSON。"></textarea>
+    </section>
+
+    <section class="card span12">
+      <h2>3) 庫存總覽（Balance）</h2>
+      <div class="muted">以「倉庫 + 批號（含商品與效期）」作為庫存結餘。</div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>倉庫</th>
+              <th>商品</th>
+              <th>條碼</th>
+              <th>批號</th>
+              <th>效期</th>
+              <th>數量</th>
+              <th>狀態</th>
+            </tr>
+          </thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card span12">
+      <h2>4) 異動紀錄（Ledger，最近 50 筆）</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>使用者</th>
+              <th>動作</th>
+              <th>倉庫</th>
+              <th>商品</th>
+              <th>批號</th>
+              <th>效期</th>
+              <th>數量</th>
+              <th>備註</th>
+            </tr>
+          </thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
