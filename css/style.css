@@ -45,3 +45,12 @@ th, td{ border-bottom:1px solid var(--bd2); padding:8px; text-align:left; vertic
   .span4,.span8{ grid-column:span 12; }
   .grid2{ grid-template-columns:1fr; }
 }
+
+.scanPanel video{
+  width:100%;
+  max-height:280px;
+  border:1px solid #ddd;
+  border-radius:12px;
+  background:#000;
+}
+

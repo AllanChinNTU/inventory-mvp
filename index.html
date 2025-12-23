@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Inventory MVP v2 (Modular + Fake Auth)</title>
+  <title>Inventory MVP v2 (Modular + Fake Auth + Camera Scan)</title>
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
   <header class="topbar">
     <div>
       <h1>庫存管理 MVP v2</h1>
-      <div class="muted">模組化（db/ui/auth）＋假登入＋可部署 GitHub Pages</div>
+      <div class="muted">模組化（db/ui/auth/scanner）＋假登入＋可部署 GitHub Pages</div>
     </div>
     <div class="userbox">
       <span id="whoami" class="pill"></span>
@@ -86,6 +86,7 @@
         </div>
       </div>
 
+      <!-- 商品 + 條碼（手動/相機掃描） -->
       <div class="row">
         <div>
           <label>商品</label>
@@ -93,7 +94,17 @@
         </div>
         <div>
           <label>條碼快速查找（掃描或輸入後 Enter）</label>
-          <input id="txScan" placeholder="例如：ABC-12345" />
+          <div class="row">
+            <input id="txScan" placeholder="例如：ABC-12345" />
+            <button id="scanBtn" class="btn">相機掃描</button>
+            <button id="stopScanBtn" class="btn" disabled>停止</button>
+          </div>
+          <div id="scanMsg" class="muted"></div>
+
+          <div id="scanPanel" class="scanPanel" style="display:none; margin-top:8px;">
+            <video id="scanVideo" playsinline></video>
+            <div class="muted" style="margin-top:6px;">提示：把條碼放在鏡頭中央，保持穩定。</div>
+          </div>
         </div>
       </div>
 
