@@ -4,6 +4,7 @@ import {
   addWarehouse,
   addProduct,
   postTransaction,
+  fefoOut,
   exportDbJson,
   importDbJson,
   resetDb,
@@ -308,10 +309,22 @@ export function bindAppEvents(actor) {
       const qty = $("txQty").value;
       const note = $("txNote").value.trim();
 
-      if (!lotNo) return setMsg("txMsg", "請輸入批號（Lot）", false);
+      if(type === "OUT" && !lotNo){
+        // FEFO出庫：lot留空時自動扣帳
+        const created = fefoOut({
+          warehouseId,
+          productId,
+          qtyOut: qty,
+          note
+        }, actor);
 
-      postTransaction({ type, warehouseId, productId, lotNo, expDate, qty, note }, actor);
-
+        setMsg("txMsg", `FEFO 出庫完成：已產生 ${created.length} 筆批號扣帳紀錄`, true);
+      } else {
+        if (!lotNo) return setMsg("txMsg", "請輸入批號（Lot）", false);
+        postTransaction({ type, warehouseId, productId, lotNo, expDate, qty, note }, actor);
+        setMsg("txMsg", "異動已寫入", true);
+      }
+      
       setMsg("txMsg", "異動已寫入", true);
       $("txLot").value = "";
       $("txExp").value = "";

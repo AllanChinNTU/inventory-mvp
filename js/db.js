@@ -142,3 +142,73 @@ export function findProductByBarcode(code){
   const db = loadDb();
   return db.products.find(p => (p.barcode||"").trim() === code.trim());
 }
+
+export function fefoOut({ warehouseId, productId, qtyOut, note }, actor){
+  const db = loadDb();
+  const need = Math.abs(parseInt(qtyOut, 10));
+  if(!need) throw new Error("Qty must be non-zero integer.");
+
+  // 找出此倉庫、此商品的所有 lot balances
+  const candidates = db.stockBalances
+    .map(b=>{
+      const lot = db.lots.find(l=>l.id===b.lotId);
+      if(!lot) return null;
+      if(lot.productId !== productId) return null;
+      if(b.warehouseId !== warehouseId) return null;
+      return { bal: b, lot };
+    })
+    .filter(Boolean)
+    .filter(x => x.bal.qty > 0);
+
+  if(candidates.length === 0){
+    throw new Error("No stock available for this product in this warehouse.");
+  }
+
+  // FEFO排序：有日期者先比日期，沒日期者排最後；同日再用 lotNo
+  candidates.sort((a,b)=>{
+    const ae = a.lot.expDate || "9999-12-31";
+    const be = b.lot.expDate || "9999-12-31";
+    if(ae !== be) return ae.localeCompare(be);
+    return (a.lot.lotNo || "").localeCompare(b.lot.lotNo || "");
+  });
+
+  // 檢查總量是否足夠
+  const total = candidates.reduce((s,x)=>s+x.bal.qty,0);
+  if(total < need){
+    throw new Error(`Insufficient stock (total=${total}, need=${need}).`);
+  }
+
+  // 逐批扣帳，寫入多筆交易
+  let remaining = need;
+  const created = [];
+
+  for(const c of candidates){
+    if(remaining <= 0) break;
+    const take = Math.min(c.bal.qty, remaining);
+
+    c.bal.qty -= take;
+    c.bal.updatedAt = nowIso();
+
+    const tx = {
+      id: uid(),
+      ts: nowIso(),
+      type: "OUT",
+      warehouseId,
+      productId,
+      lotId: c.lot.id,
+      qtyDelta: -take,
+      note: note ? `${note} (FEFO)` : "(FEFO)",
+      createdBy: actor.id
+    };
+    db.stockTransactions.push(tx);
+    created.push(tx);
+
+    remaining -= take;
+  }
+
+  // 移除 0 balance
+  db.stockBalances = db.stockBalances.filter(b => b.qty !== 0);
+
+  saveDb(db);
+  return created; // 多筆
+}
