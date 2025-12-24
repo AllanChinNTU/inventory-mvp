@@ -65,12 +65,26 @@ export function addProduct({name, barcode, unit}, actor){
 
 export function getOrCreateLot({productId, lotNo, expDate}, actor){
   const db = loadDb();
-  const existing = db.lots.find(l => l.productId===productId && l.lotNo===lotNo && (l.expDate||"")===(expDate||""));
-  if(existing) return existing;
+
+  // 以 productId + lotNo 當唯一批號
+  const existing = db.lots.find(l => l.productId===productId && l.lotNo===lotNo);
+  if(existing){
+    // 如果之前沒效期、這次有填，或效期不同，則更新
+    const incoming = expDate || "";
+    if(incoming && existing.expDate !== incoming){
+      existing.expDate = incoming;
+      existing.updatedAt = nowIso();
+      // 可選：紀錄更新者
+      existing.updatedBy = actor.id;
+      saveDb(db);
+    }
+    return existing;
+  }
 
   const lot = {
     id: uid(),
-    productId, lotNo,
+    productId,
+    lotNo,
     expDate: expDate || "",
     createdAt: nowIso(),
     updatedAt: nowIso(),
