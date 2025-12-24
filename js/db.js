@@ -6,6 +6,14 @@ export function uid() {
 }
 export function nowIso(){ return new Date().toISOString(); }
 
+// Normalize date inputs (store as YYYY-MM-DD) to avoid timezone/parsing differences
+export function normalizeDate(dateStr){
+  if(!dateStr) return "";
+  const d = new Date(dateStr);
+  if(Number.isNaN(d.getTime())) return dateStr;
+  return d.toISOString().slice(0,10);
+} 
+
 export function initDbIfEmpty() {
   const raw = localStorage.getItem(KEY);
   if (raw) return;
@@ -70,7 +78,7 @@ export function getOrCreateLot({productId, lotNo, expDate}, actor){
   const existing = db.lots.find(l => l.productId===productId && l.lotNo===lotNo);
   if(existing){
     // 如果之前沒效期、這次有填，或效期不同，則更新
-    const incoming = expDate || "";
+const incoming = normalizeDate(expDate);
     if(incoming && existing.expDate !== incoming){
       existing.expDate = incoming;
       existing.updatedAt = nowIso();
@@ -85,7 +93,7 @@ export function getOrCreateLot({productId, lotNo, expDate}, actor){
     id: uid(),
     productId,
     lotNo,
-    expDate: expDate || "",
+    expDate: normalizeDate(expDate),
     createdAt: nowIso(),
     updatedAt: nowIso(),
     createdBy: actor.id

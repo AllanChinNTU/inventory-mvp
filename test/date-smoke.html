@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inventory MVP — Expiration Date Smoke Test</title>
+  <style>
+    body{font-family: system-ui, Arial; margin:20px}
+    input, button, select{margin:4px 0; padding:6px}
+    pre{background:#f7f7f7;padding:10px;border:1px solid #ddd}
+    .ok{color:green}
+    .bad{color:red}
+  </style>
+</head>
+<body>
+  <h1>Expiration Date Smoke Test</h1>
+  <p>Use this page to test how expiration dates are normalized & stored by <code>js/db.js</code> across browsers.</p>
+
+  <div>
+    <label>Warehouse name <input id="whName" value="SmokeWH" /></label><br/>
+    <label>Product name <input id="prodName" value="SmokeProd" /></label><br/>
+    <label>Lot No <input id="lotNo" value="S-1" /></label><br/>
+    <label>Expiration <input id="expDate" type="date" /></label><br/>
+    <label>Alternate input (free text) <input id="expText" placeholder="2025-12-24 or Dec 24 2025" /></label><br/>
+    <label>Qty <input id="qty" type="number" value="5" /></label><br/>
+
+    <button id="initBtn">Init DB (if needed)</button>
+    <button id="createBtn">Create WH/Product + Post IN</button>
+    <button id="showBtn">Show lots & DB</button>
+    <button id="migrateBtn">Normalize all existing lot dates (migration)</button>
+  </div>
+
+  <h3>Outputs</h3>
+  <div id="out"></div>
+  <pre id="dump"></pre>
+
+  <script type="module">
+    import { initDbIfEmpty, addWarehouse, addProduct, postTransaction, loadDb, normalizeDate } from '../js/db.js';
+
+    const $ = (id) => document.getElementById(id);
+
+    function log(msg, cls){
+      const d = document.createElement('div');
+      if(cls) d.className = cls;
+      d.textContent = msg;
+      $('out').appendChild(d);
+    }
+
+    $('initBtn').addEventListener('click', ()=>{
+      initDbIfEmpty();
+      $('out').innerHTML = '';
+      log('DB initialised', 'ok');
+    });
+
+    $('createBtn').addEventListener('click', ()=>{
+      try{
+        initDbIfEmpty();
+        const actor = { id: 'u_manager', username: 'manager', role: 'manager' };
+        const wh = addWarehouse($('whName').value || 'WH', actor);
+        const prod = addProduct({ name: $('prodName').value || 'P', barcode: '', unit: '' }, actor);
+        const lotNo = $('lotNo').value.trim();
+        const expVal = $('expDate').value || $('expText').value.trim();
+        const qty = $('qty').value;
+
+        postTransaction({ type: 'IN', warehouseId: wh.id, productId: prod.id, lotNo, expDate: expVal, qty, note: 'smoke' }, actor);
+
+        log(`Posted IN: lot=${lotNo}, expInput=${expVal}`, 'ok');
+        $('showBtn').click();
+      }catch(e){
+        log(e.message, 'bad');
+      }
+    });
+
+    $('showBtn').addEventListener('click', ()=>{
+      const db = loadDb();
+      const lots = db.lots || [];
+      $('dump').textContent = JSON.stringify({ lots }, null, 2);
+      $('out').innerHTML = '';
+      for(const l of lots){
+        const parsed = {
+          stored: l.expDate,
+          asISO: (l.expDate ? (new Date(l.expDate).toISOString?.() ?? String(new Date(l.expDate))) : '(empty)'),
+          normalized: normalizeDate(l.expDate)
+        };
+        log(JSON.stringify(parsed));
+      }
+    });
+
+    $('migrateBtn').addEventListener('click', ()=>{
+      const db = loadDb();
+      let changed = 0;
+      for(const l of db.lots){
+        const n = normalizeDate(l.expDate);
+        if(n && l.expDate !== n){ l.expDate = n; l.updatedAt = new Date().toISOString(); changed++; }
+      }
+      localStorage.setItem('INV_MVP_V2', JSON.stringify(db));
+      log(`Migration applied, ${changed} lots updated`, 'ok');
+      $('showBtn').click();
+    });
+
+    // auto-show current lots on load
+    $('showBtn').click();
+  </script>
+</body>
+</html>

@@ -18,6 +18,8 @@ const $ = (id) => document.getElementById(id);
 
 function fmtDate(d) {
   if (!d) return "";
+  // If already in YYYY-MM-DD format, return as-is to avoid timezone shifts
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return d;
   return dt.toISOString().slice(0, 10);
